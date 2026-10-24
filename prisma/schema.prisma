@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String           @id @default(cuid())
+  token              String           @unique
+  name               String           @default("You")
+  disclaimerAccepted Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  profile            Profile?
+  programs           Program[]
+  checkIns           CheckIn[]
+  billingAccount     BillingAccount?
+  billingPayments    BillingPayment[]
+  billingEvents      BillingEvent[]
+}
+
+model Profile {
+  id              String @id @default(cuid())
+  userId          String @unique
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal            String
+  days            Int
+  equipment       String
+  experience      String
+  limitations     String @default("[]")
+  pausedAreas     String @default("[]")
+  blockedDates    String @default("[]")
+  themePreference String @default("system")
+}
+
+model Program {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  startDate String
+  active    Boolean      @default(true)
+  sessions  Session[]
+  changes   PlanChange[]
+  createdAt DateTime     @default(now())
+}
+
+model Session {
+  id            String   @id
+  programId     String
+  program       Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  date          String
+  title         String
+  week          Int
+  status        String   @default("planned")
+  prescriptions String
+  restart       Boolean  @default(false)
+  prepared      Boolean  @default(false)
+  missed        Boolean  @default(false)
+  missedWeek    String?
+  setLogs       SetLog[]
+  checkIn       CheckIn?
+
+  @@index([programId, date])
+}
+
+model Exercise {
+  id            String   @id
+  name          String
+  pattern       String
+  loadedAreas   String
+  equipment     String
+  swapIds       String
+  increment     Float
+  defaultWeight Float
+  setLogs       SetLog[]
+}
+
+model SetLog {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  setIndex   Int
+  weight     Float
+  reps       Int
+  status     String
+  rpe        Float    @default(8)
+
+  @@unique([sessionId, exerciseId, setIndex])
+}
+
+model CheckIn {
+  id        String   @id @default(cuid())
+  sessionId String?  @unique
+  session   Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String
+  energy    Int
+  pain      String
+  area      String?
+  symptoms  String   @default("[]")
+}
+
+model PlanChange {
+  id               String   @id @default(cuid())
+  programId        String
+  program          Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  type             String
+  reasonCode       String
+  affectedSessions String
+  before           String
+  after            String
+  explanation      String
+  createdAt        DateTime @default(now())
+}
+
+model BillingAccount {
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerCustomerId     String?   @unique
+  providerSubscriptionId String?   @unique
+  providerVariantId      String?
+  customerPortalUrl      String?
+  plan                   String    @default("free")
+  status                 String    @default("inactive")
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+model BillingPayment {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkoutId     String    @unique
+  orderId        String?
+  subscriptionId String?
+  amount         Int
+  currency       String
+  status         String
+  itemName       String
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model BillingEvent {
+  id                     String   @id
+  type                   String
+  userId                 String?
+  user                   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  orderId                String?
+  checkoutId             String?
+  processedAt            DateTime @default(now())
+}
